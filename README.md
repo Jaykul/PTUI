@@ -15,5 +15,14 @@ I just started playing. I have created:
 - `Select-Interactive` which combines the two and:
   - Switches to the alternate buffer and back
   - Draws a box (with an optional title)
-  - Shows a list in the box and lets you select one. It uses Format-Table to make the list (for now). I'll probably want to let you select properties and set up columns properly...
+  - Shows a list in the box and lets you select one. It uses Format-Table to make the list (for now).
   - Returns the actual selected item!
+
+Things that don't work, for instance:
+
+- `Show-List` (and therefore, `Select-Interactive`) doesn't scroll (if there's more items than fit on a screen height). That means it basically doesn't work if there are more items than `$Host.UI.RawUI.WindowSize.Height - 2`
+- The highlights on `Show-List` don't have a "width" so they're only as wide as the text of the item
+- There's no multi-select option
+- There's no way to specify which properties are shown
+- You can't type text to select matching items
+- There's no filtering
