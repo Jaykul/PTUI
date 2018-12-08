@@ -1,67 +1,43 @@
 function Show-List {
     [CmdletBinding()]
     param(
-        $Top = 1,
-        $Left = 1,
+        [int]$Top = 1,
+        [int]$Left = 1,
+        [int]$Height = $Host.UI.RawUI.WindowSize.Height,
+        [int]$Width = $Host.UI.RawUI.WindowSize.Width,
         [string[]]$List,
         [RgbColor]$BackgroundColor = "Black",
         [RgbColor]$HighlightColor  = "Gray",
-        [RgbColor]$SelectedColor   = "DarkGray"
+        [RgbColor]$SelectionColor   = "DarkGray",
+        [int[]]$SelectedItems,
+        [int]$ActiveIndex = $($List.Count - 1),
+        [int]$Offset = $([Math]::Max(0, $ActiveIndex - $Height))
     )
+    $Height = [Math]::Min(($Host.UI.RawUI.WindowSize.Height - ($Top - 1)), $Height)
+    $Height = [Math]::Min($Height, $List.Count)
+    $Width  = [Math]::Min(($Host.UI.RawUI.WindowSize.Width - ($Left - 1)), $Width)
 
-    # Write out all the lines
-    $X = $Top
-    $Background = $BackgroundColor.ToVtEscapeSequence($true)
-    $Highlight  = $HighlightColor.ToVtEscapeSequence($true)
-    $Selected   = $SelectedColor.ToVtEscapeSequence($true)
-
-    foreach ($l in $List) {
-        Write-Host (($SetXY -f $Left, $X++) + $Background + $l.TrimEnd()) -NoNewline
+    # Fix the offset
+    if ($ActiveIndex -lt $Offset) {
+        $Offset = $ActiveIndex
+    } elseif ($ActiveIndex -gt ($Offset + $Height)) {
+        $Offset = $ActiveIndex - $Height
     }
 
-    $Active = $List.Count
-    do {
-        $null = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyUp,IncludeKeyDown")
-    } while ($Host.UI.RawUI.KeyAvailable)
+    $Last = [Math]::Min($List.Count, $Offset + $Height)
 
-    do {
-        if (!$Host.UI.RawUI.KeyAvailable) {
-            Start-Sleep -Milliseconds 10
-            continue
+    # Write out all the lines
+    $X      = $Top
+    for ($i = $Offset; $i -lt $Last; $i++) {
+        $Bg = if ($i -in $SelectedItems) {
+            $SelectionColor.ToVtEscapeSequence($true)
+        } elseif ($i -eq $ActiveIndex) {
+            $HighlightColor.ToVtEscapeSequence($true)
+        } else {
+            $BackgroundColor.ToVtEscapeSequence($true)
         }
-        $Key = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyUp,IncludeKeyDown")
-        switch ($Key.VirtualKeyCode) {
-            38 {# UP KEY
-                # Ignore the key up because we act on key down
-                if(!$Key.KeyDown -or $Active -eq 0) { continue }
+        $item = $List[$i].TrimEnd().PadRight($Width).Substring(0,$Width)
+        Write-Host (($SetXY -f $Left, $X++) + $Bg + $item + $Bg:Clear) -NoNewline
+    }
 
-                if($Active -lt $List.Count) {
-                    Write-Host -NoNewLine (($SetXY -f $Left, ($Active + $Top)) + $Background + $List[$Active])
-                }
-
-                $Active = [Math]::Max(0, $Active - 1)
-                # Write-Verbose "Key: $($Key.VirtualKeyCode) $(if($Key.KeyDown){'Down'}else{'Up'}) ($Active)"
-
-                Write-Host -NoNewLine (($SetXY -f $Left, ($Active + $Top)) + $Highlight + $List[$Active])
-            }
-            40 {# DOWN KEY
-                # Ignore the key up because we act on key down
-                if(!$Key.KeyDown -or $Active -eq ($List.Count - 1)) { continue }
-
-                if($Active -ge $List.Count) {
-                    $Active = -1
-                } else {
-                    Write-Host -NoNewLine (($SetXY -f $Left, ($Active + $Top)) + $Background + $List[$Active])
-                }
-
-                $Active = [Math]::Min($List.Count - 1, $Active + 1)
-                # Write-Verbose "Key: $($Key.VirtualKeyCode) $(if($Key.KeyDown){'Down'}else{'Up'}) ($Active)"
-
-                Write-Host -NoNewLine (($SetXY -f $Left, ($Active + $Top)) + $Highlight + $List[$Active])
-            }
-            13 {
-                return $Active
-            }
-        }
-    } while ($true)
 }

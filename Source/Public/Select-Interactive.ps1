@@ -22,34 +22,104 @@ function Select-Interactive {
         $null = $PSBoundParameters.Remove("InputObject")
 
         [string[]]$Lines = $Collection | Format-Table -HideTableHeaders -GroupBy {} | Out-String -Stream
-        $Lines = TrimLines $Lines
+        $Lines  = TrimLines $Lines
 
-        $Width = $Lines + @($Title) -replace $EscapeRegex | Measure-Object Length -Maximum | Select-Object -ExpandProperty Maximum
-        $Width += $Padding.Left + $Padding.Right
+        $LineWidth = $Lines + @($Title) -replace $EscapeRegex | Measure-Object Length -Maximum | Select-Object -ExpandProperty Maximum
+        $BorderWidth  = [Math]::Min($Host.UI.RawUI.WindowSize.Width, $LineWidth + $Padding.Left + $Padding.Right + 2)
 
-        $Height = $Lines.Count + $Padding.Top + $Padding.Bottom
-        $Height = [Math]::Min($Height, $Host.Ui.RawUI.WindowSize.Height)
-        $Top = 2
-        if($Title) {
-            $Top += 1 + ($Title -split "\r?\n").Count
-        }
-        $Left = 2 + $Padding.Left
+        $LineHeight = $Lines.Count
+        $BorderHeight = [Math]::Min($Host.UI.RawUI.WindowSize.Height, $LineHeight + $Padding.Top + $Padding.Bottom + 2)
 
         # Use alternate screen buffer, and
-        # Make sure the title doesn't scroll off
-        # DEBUG: Write-Host "$($SetXY -f 4, 55)Show: $Width x $Height at $Left, $Top"
-
         Write-Host "$Alt$Hide" -NoNewline
-        # Write-Host ("$Freeze" -f $TitleHeight, ($Height - 1)) -NoNewline
+        # Make sure the title doesn't scroll off
+        # Write-Host ("$Freeze" -f $TitleHeight, ($BorderHeight - 1)) -NoNewline
 
-        Show-Box -Width $Width -Height $Height -Title $Title -BackgroundColor $BackgroundColor -ForegroundColor $ForegroundColor
-        Write-Host "Press Up or Down keys and ENTER to select... $Up" -ForegroundColor $ForegroundColor -NoNewline
+        Show-Box -Width $BorderWidth -Height $BorderHeight -Title $Title -BackgroundColor $BackgroundColor -ForegroundColor $ForegroundColor
+        # Write-Host "Press Up or Down keys and ENTER to select... $Up" -ForegroundColor $ForegroundColor -NoNewline
 
-        $Selected = Show-List -Top $Top -Left $Left -List $Lines -BackgroundColor $BackgroundColor
+        $TitleHeight = if($Title) {
+            1 + ($Title -split "\r?\n").Count
+        } else {
+            0
+        }
 
-        Write-Host "$Main$Show" -NoNewline
+        $Width = [Math]::Min($LineWidth, $Host.UI.RawUI.WindowSize.Width - 2 - $Padding.Left - $Padding.Right)
+        $Height = [Math]::Min($LineHeight, $Host.UI.RawUI.WindowSize.Height - 2 - $TitleHeight - $Padding.Top - $Padding.Bottom)
 
-        $Collection[$Selected]
+        $Left = 2 + $Padding.Left
+        $Top = 2 + $Padding.Top + $TitleHeight
+
+        $List = @{
+            Top = $Top
+            Left = $Left
+            Width = $Width
+            Height = $Height
+            List = $Lines
+            BackgroundColor = $BackgroundColor
+        }
+
+        $Selected = @()
+        $Active = $Lines.Count - 1
+        $Max = $Lines.Count - 1
+        $Offset = [Math]::Max(0, $Active - $Height)
+
+        Show-List @List -SelectedItems $Selected -Offset $Offset
+
+        do {
+            $null = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyUp,IncludeKeyDown")
+        } while ($Host.UI.RawUI.KeyAvailable)
+
+        do {
+            if (!$Host.UI.RawUI.KeyAvailable) {
+                Start-Sleep -Milliseconds 10
+                continue
+            }
+            $Key = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyUp,IncludeKeyDown")
+            switch ($Key.VirtualKeyCode) {
+                38 {# UP KEY
+                    # Ignore the key up because we act on key down
+                    if (!$Key.KeyDown) { continue }
+
+                    if ($Active -le 0) {
+                        $Active = $Lines.Count
+                        $Offset = $Lines.Count - $Height
+                    }
+
+                    $Active = [Math]::Max(0, $Active - 1)
+                    $Offset = [Math]::Min($Offset, $Active)
+                }
+                40 {# DOWN KEY
+                    # Ignore the key up because we act on key down
+                    if (!$Key.KeyDown) { continue }
+
+                    if ($Active -ge $Max) {
+                        $Active = -1
+                        $Offset = 0
+                    }
+                    $Active = [Math]::Min($Max, $Active + 1)
+                    $Offset = [Math]::Max($Offset, $Active - $Height)
+                }
+                32 { # Space: select
+                    if(!$Key.KeyDown -or $Active -gt $Max) { continue }
+
+                    if ($Active -in $Selected) {
+                        $Selected = @($Selected -ne $Active)
+                    } else {
+                        $Selected += $Active
+                    }
+                }
+                13 {
+                    Write-Host "$Main$Show" -NoNewline
+                    if($Selected.Count -eq 0) {
+                        $Selected = @($Active)
+                    }
+                    $Collection[$Selected]
+                    return
+                }
+            }
+            Show-List @List -SelectedItems $Selected -Active $Active -Offset $Offset
+        } while ($true)
     }
 }
 

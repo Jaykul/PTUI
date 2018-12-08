@@ -3,9 +3,9 @@ function Show-Box {
     param (
         [string]$Title,
 
-        [int]$Width = $Host.UI.RawUI.WindowSize.Width,
+        [int]$Width = $($Host.UI.RawUI.WindowSize.Width),
 
-        [int]$Height = $($Host.UI.RawUI.WindowSize.Height - ($Title -split "\r?\n").Count),
+        [int]$Height = $($Host.UI.RawUI.WindowSize.Height - (if($Title){($Title -split "\r?\n").Count} else {0})),
 
         [RgbColor]$BackgroundColor = $Host.PrivateData.WarningBackgroundColor,
 
@@ -13,13 +13,20 @@ function Show-Box {
     )
 
     end {
-        Write-Verbose "Make a box of Width: $Width with background $BackgroundColor"
+        # Write-Verbose "Make a box of Width: $Width with background $BackgroundColor"
+        $Height = [Math]::Min($Host.UI.RawUI.WindowSize.Height, $Height)
+        $Width  = [Math]::Min($Host.UI.RawUI.WindowSize.Width, $Width)
+        # Subtract the border cell
+        $Width -= 2
+        $Height -= 2
 
         $b = $BackgroundColor.ToVtEscapeSequence($true)
         $f = $ForegroundColor.ToVtEscapeSequence()
 
         # Top Bar
-        $b + $f + $BoxChars.TopLeftDouble + ($BoxChars.HorizontalDouble * $Width) + $BoxChars.TopRightDouble
+        Write-Host -NoNewline (
+            $b + $f + $BoxChars.TopLeftDouble + ($BoxChars.HorizontalDouble * $Width) + $BoxChars.TopRightDouble
+        )
 
         # Title Bar
         $TitleBar = @(
@@ -31,22 +38,28 @@ function Show-Box {
                     } else {
                         (($Width - $TitleLength) / 2) - 1
                     }
-                    $b + $f + $BoxChars.VerticalDouble + (" " * $Width) + $BoxChars.VerticalDouble +
-                    "$([char]27)[$($TitlePadding)G" + $Fg:Clear + $l
+                    Write-Host -NoNewline (
+                        "`n" + $b + $f + $BoxChars.VerticalDouble + (" " * $Width) + $BoxChars.VerticalDouble +
+                        "$([char]27)[$($TitlePadding)G" + $Fg:Clear + $l
+                    )
                 }
-                $b + $f + $BoxChars.VerticalDoubleRightDouble + ($BoxChars.HorizontalDouble * $Width) + $BoxChars.VerticalDoubleLeftDouble
+                Write-Host -NoNewline (
+                    "`n" + $b + $f + $BoxChars.VerticalDoubleRightDouble + ($BoxChars.HorizontalDouble * $Width) + $BoxChars.VerticalDoubleLeftDouble
+                )
             }
         )
         $TitleBar
 
         # Main box
         for ($i = 0; $i -lt $Height; $i++) {
-            $b + $f + $BoxChars.VerticalDouble + (" " * $Width) + $BoxChars.VerticalDouble
+            Write-Host -NoNewline ("`n" + $b + $f + $BoxChars.VerticalDouble + (" " * $Width) + $BoxChars.VerticalDouble)
         }
 
         # Bottom Bar (plus reset)
-        $b + $f + $BoxChars.BottomLeftDouble + ($BoxChars.HorizontalDouble * $Width) + $BoxChars.BottomRightDouble +
-        $Fg:Clear +
-        $Bg:Clear
+        Write-Host -NoNewline (
+            "`n" + $b + $f + $BoxChars.BottomLeftDouble + ($BoxChars.HorizontalDouble * $Width) + $BoxChars.BottomRightDouble +
+            $Fg:Clear +
+            $Bg:Clear
+        )
     }
 }
