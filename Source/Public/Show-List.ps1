@@ -13,21 +13,21 @@ function Show-List {
         [int]$ActiveIndex = $($List.Count - 1),
         [int]$Offset = $([Math]::Max(0, $ActiveIndex - $Height))
     )
-    $Height = [Math]::Min(($Host.UI.RawUI.WindowSize.Height - ($Top - 1)), $Height)
-    $Height = [Math]::Min($Height, $List.Count)
+    $ActualHeight = [Math]::Min(($Host.UI.RawUI.WindowSize.Height - ($Top - 1)), $Height)
+    $ActualHeight = [Math]::Min($ActualHeight, $List.Count)
     $Width  = [Math]::Min(($Host.UI.RawUI.WindowSize.Width - ($Left - 1)), $Width)
 
     # Fix the offset
     if ($ActiveIndex -lt $Offset) {
         $Offset = $ActiveIndex
-    } elseif ($ActiveIndex -gt ($Offset + $Height)) {
-        $Offset = $ActiveIndex - $Height
+    } elseif ($ActiveIndex -gt ($Offset + $ActualHeight)) {
+        $Offset = $ActiveIndex - $ActualHeight
     }
 
-    $Last = [Math]::Min($List.Count, $Offset + $Height)
+    $Last = [Math]::Min($List.Count, $Offset + $ActualHeight)
 
     # Write out all the lines
-    $X      = $Top
+    $Line   = $Top
     for ($i = $Offset; $i -lt $Last; $i++) {
         $Bg = if ($i -in $SelectedItems) {
             $SelectionColor.ToVtEscapeSequence($true)
@@ -37,7 +37,13 @@ function Show-List {
             $BackgroundColor.ToVtEscapeSequence($true)
         }
         $item = $List[$i].TrimEnd().PadRight($Width).Substring(0,$Width)
-        Write-Host (($SetXY -f $Left, $X++) + $Bg + $item + $Bg:Clear) -NoNewline
+        Write-Host (($SetXY -f $Left, $Line++) + $Bg + $item + $Bg:Clear) -NoNewline
+    }
+
+    # if they filter, we're going to need to blank the rest of the lines
+    while ($Line -lt $Height) {
+        $item = " " * $Width
+        Write-Host (($SetXY -f $Left, $Line++) + $HighlightColor.ToVtEscapeSequence($true) + $item + $Bg:Clear) -NoNewline
     }
 
 }
