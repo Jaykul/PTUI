@@ -24,5 +24,5 @@ I just started playing. I have created:
 Things that don't work, for instance:
 
 - There's no way to specify which properties are shown
-- You can't sort after the display
+- You can't re-sort after the display
 - Multi-select isn't intuitive enough: you can press Space to toggle selection, but you can't hold SHIFT and press the Up/Down arrows.

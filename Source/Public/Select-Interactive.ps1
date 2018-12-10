@@ -67,11 +67,11 @@ function Select-Interactive {
             BackgroundColor = $BackgroundColor
         }
 
-        Show-List @List -List $Filtered -Active $Active -SelectedItems $Select -Offset $Offset <# -Height $Height #>
+        Show-List @List -List $Filtered -Active $Active -SelectedItems $Select -Offset $Offset
 
-        do {
-            $null = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyUp,IncludeKeyDown")
-        } while ($Host.UI.RawUI.KeyAvailable)
+        # do {
+        #     $null = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyUp,IncludeKeyDown")
+        # } while ($Host.UI.RawUI.KeyAvailable)
 
         do {
             if (!$Host.UI.RawUI.KeyAvailable) {
@@ -82,8 +82,6 @@ function Select-Interactive {
             switch ($Key.VirtualKeyCode) {
                 38 {# UP KEY
                     # Ignore the key up because we act on key down
-                    # if (!$Key.KeyDown) { continue }
-
                     if ($Active -le 0) {
                         $Active = $Max
                         $Offset = $Filtered.Count - $Height
@@ -91,14 +89,12 @@ function Select-Interactive {
                         $Active = [Math]::Max(0, $Active - 1)
                         $Offset = [Math]::Min($Offset, $Active)
                     }
-
-                    # DEBUG:
-                    Write-Host (($SetXY -f ($Width - 35), 0) + ("{{UP}} Active: {0:d2} Offset: {1:d2} of {2:d3} ({3:d2})   " -f $Active, $Offset, $Max, $Filtered.Count) ) -NoNewline
+                    if ($DebugPreference -ne "SilentlyContinue") {
+                        Write-Host (($SetXY -f ($Width - 35), 0) + ("{{UP}} Active: {0:d2} Offset: {1:d2} of {2:d3} ({3:d2})   " -f $Active, $Offset, $Max, $Filtered.Count) ) -NoNewline
+                    }
                 }
                 40 {# DOWN KEY
                     # Ignore the key up because we act on key down
-                    # if (!$Key.KeyDown) { continue }
-
                     if ($Active -ge $Max) {
                         $Active = 0
                         $Offset = 0
@@ -106,17 +102,16 @@ function Select-Interactive {
                         $Active = [Math]::Min($Max, $Active + 1)
                         $Offset = [Math]::Max($Offset, $Active - $Height + 1)
                     }
-                    # DEBUG:
-                    Write-Host (($SetXY -f ($Width - 35), 0) + ("{{DN}} Active: {0:d2} Offset: {1:d2} of {2:d3}" -f $Active, $Offset, $Filtered.Count) ) -NoNewline
+                    if ($DebugPreference -ne "SilentlyContinue") {
+                        Write-Host (($SetXY -f ($Width - 35), 0) + ("{{DN}} Active: {0:d2} Offset: {1:d2} of {2:d3}" -f $Active, $Offset, $Filtered.Count) ) -NoNewline
+                    }
                 }
                 # alpha numeric (and backspace)
                 {$_ -eq 8 -or $_ -ge 48 -and $_ -le 90} {
-                    # if (!$Key.KeyDown) { continue }
-
                     # backspace
                     if ($_ -eq 8) {
                         # Ctrl backspace
-                        if ($key.ControlKeyState -match "RightCtrlPressed|LeftCtrlPressed") {
+                        if ($Key.ControlKeyState -match "RightCtrlPressed|LeftCtrlPressed") {
                             while ($Filter.Length -and $Filter[-1] -notmatch "\s") {
                                 $null = $Filter.Remove($Filter.Length - 1, 1)
                             }
@@ -131,7 +126,7 @@ function Select-Interactive {
                     if ($Filterable) {
                         # Filter and redraw
                         if ($Filter.Length) {
-                            $Filtered = $Lines -match "\b$($Filter.ToString() -split " " -join '.*\b')"
+                            $Filtered = $Lines | Where-Object { $_ -replace $EscapeRegex -match "\b$($Filter.ToString() -split " " -join '.*\b')" }
                         } else {
                             $Filtered = $Lines
                         }
@@ -140,22 +135,20 @@ function Select-Interactive {
                         $Offset = [Math]::Max(0, $Active - $Height + 1)
                     } else {
                         # select
-                        $Selected = $Lines -match "\b$($Filter.ToString() -split " " -join '.*\b')"
+                        $Selected = $Lines | Where-Object { $_  -replace $EscapeRegex -match "\b$($Filter.ToString() -split " " -join '.*\b')" }
                         $Active = $Selected | Select-Object -Expand Index -First 1
                         $Offset = [Math]::Max(0, $Selected[-1].Index - $Height + 1)
                     }
 
                     Write-Host (
-                        ($SetXY -f 5, ($Height + 2)) +
+                        ($SetXY -f 4, $Host.UI.RawUI.WindowSize.Height) +
                         $Filter.ToString() +
                         $ForegroundColor.ToVtEscapeSequence() +
-                        ($BoxChars.HorizontalDouble * ($Width - 5 - $Filter.Length)) +
+                        ($BoxChars.HorizontalDouble * ($Width - 4 - $Filter.Length)) +
                         $Fg:Clear
                     ) -NoNewline
                 }
                 32 { # Space: select
-                    # if (!$Key.KeyDown) { continue }
-
                     if ($Filter.Length -gt 0) {
                         $null = $Filter.Append($Key.Character)
                     }
@@ -179,7 +172,7 @@ function Select-Interactive {
             $Max    = $Filtered.Count - 1
             $Height = [Math]::Min($Filtered.Count, $MaxHeight)
 
-            Show-List @List -List $Filtered -SelectedItems $Select -Offset $Offset <# -Height $Height #> -Active $Active
+            Show-List @List -List $Filtered -SelectedItems $Select -Offset $Offset -Active $Active
         } while ($true)
     }
 }
