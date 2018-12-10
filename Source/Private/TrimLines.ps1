@@ -12,6 +12,10 @@ function TrimLines {
     end {
         $first = [Array]::FindIndex($AllLines, [Predicate[string]] {![string]::IsNullOrWhiteSpace($args[0])})
         $last = [Array]::FindLastIndex($AllLines, [Predicate[string]] {![string]::IsNullOrWhiteSpace($args[0])})
-        $AllLines[$first..$last]
+        $Index = 0
+        foreach ($line in $AllLines[$first..$last]) {
+            Add-Member -Input $line -MemberType NoteProperty -Name Index -Value $Index -PassThru
+            $Index += 1
+        }
     }
 }

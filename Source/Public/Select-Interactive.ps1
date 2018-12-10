@@ -6,11 +6,11 @@ function Select-Interactive {
         [Parameter(ValueFromPipeline)]
         [PSObject[]]$InputObject,
 
-        [Padding]$Padding = @(0,0,0,0),
-
         [RgbColor]$BackgroundColor = $Host.PrivateData.WarningBackgroundColor,
 
-        [RgbColor]$ForegroundColor = $Host.PrivateData.WarningForegroundColor
+        [RgbColor]$ForegroundColor = $Host.PrivateData.WarningForegroundColor,
+
+        [switch]$Filterable
     )
     begin {
         [PSObject[]]$Collection = @()
@@ -21,14 +21,14 @@ function Select-Interactive {
     end {
         $null = $PSBoundParameters.Remove("InputObject")
 
-        [string[]]$Lines = $Collection | Format-Table -HideTableHeaders -GroupBy {} | Out-String -Stream
-        $Lines  = TrimLines $Lines
+        $Lines = $Collection | Format-Table -HideTableHeaders -GroupBy {} | Out-String -Stream
+        $Lines = TrimLines $Lines
 
         $LineWidth = $Lines + @($Title) -replace $EscapeRegex | Measure-Object Length -Maximum | Select-Object -ExpandProperty Maximum
-        $BorderWidth  = [Math]::Min($Host.UI.RawUI.WindowSize.Width, $LineWidth + $Padding.Left + $Padding.Right + 2)
+        $BorderWidth  = [Math]::Min($Host.UI.RawUI.WindowSize.Width, $LineWidth + 2)
 
         $LineHeight = $Lines.Count
-        $BorderHeight = [Math]::Min($Host.UI.RawUI.WindowSize.Height, $LineHeight + $Padding.Top + $Padding.Bottom + 2)
+        $BorderHeight = [Math]::Min($Host.UI.RawUI.WindowSize.Height, $LineHeight + 2)
 
         # Use alternate screen buffer, and
         Write-Host "$Alt$Hide" -NoNewline
@@ -44,27 +44,30 @@ function Select-Interactive {
             0
         }
 
-        $Width = [Math]::Min($LineWidth, $Host.UI.RawUI.WindowSize.Width - 2 - $Padding.Left - $Padding.Right)
-        $Height = [Math]::Min($LineHeight, $Host.UI.RawUI.WindowSize.Height - 2 - $TitleHeight - $Padding.Top - $Padding.Bottom)
+        $MaxHeight = $Host.UI.RawUI.WindowSize.Height - 2 - $TitleHeight
+        $Width = [Math]::Min($LineWidth, $Host.UI.RawUI.WindowSize.Width - 2)
 
-        $Left = 2 + $Padding.Left
-        $Top = 2 + $Padding.Top + $TitleHeight
+        $Left = 2
+        $Top = 2 + $TitleHeight
+
+
+        $Filter = [Text.StringBuilder]::new()
+        $Filtered = $Lines
+
+        $Select = @()
+        $Active = $Max    = $Filtered.Count - 1
+        $Height = [Math]::Min($Filtered.Count, $MaxHeight)
+        $Offset = [Math]::Max(0, $Active - $Height)
 
         $List = @{
             Top = $Top
             Left = $Left
             Width = $Width
             Height = $Height
-            List = $Lines
             BackgroundColor = $BackgroundColor
         }
 
-        $Selected = @()
-        $Active = $Lines.Count - 1
-        $Max = $Lines.Count - 1
-        $Offset = [Math]::Max(0, $Active - $Height)
-
-        Show-List @List -SelectedItems $Selected -Offset $Offset
+        Show-List @List -List $Filtered -Active $Active -SelectedItems $Select -Offset $Offset <# -Height $Height #>
 
         do {
             $null = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyUp,IncludeKeyDown")
@@ -75,84 +78,108 @@ function Select-Interactive {
                 Start-Sleep -Milliseconds 10
                 continue
             }
-            $Key = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyUp,IncludeKeyDown")
+            $Key = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
             switch ($Key.VirtualKeyCode) {
                 38 {# UP KEY
                     # Ignore the key up because we act on key down
-                    if (!$Key.KeyDown) { continue }
+                    # if (!$Key.KeyDown) { continue }
 
                     if ($Active -le 0) {
-                        $Active = $Lines.Count
-                        $Offset = $Lines.Count - $Height
+                        $Active = $Max
+                        $Offset = $Filtered.Count - $Height
+                    } else {
+                        $Active = [Math]::Max(0, $Active - 1)
+                        $Offset = [Math]::Min($Offset, $Active)
                     }
 
-                    $Active = [Math]::Max(0, $Active - 1)
-                    $Offset = [Math]::Min($Offset, $Active)
+                    # DEBUG:
+                    Write-Host (($SetXY -f ($Width - 35), 0) + ("{{UP}} Active: {0:d2} Offset: {1:d2} of {2:d3} ({3:d2})   " -f $Active, $Offset, $Max, $Filtered.Count) ) -NoNewline
                 }
                 40 {# DOWN KEY
                     # Ignore the key up because we act on key down
-                    if (!$Key.KeyDown) { continue }
+                    # if (!$Key.KeyDown) { continue }
 
                     if ($Active -ge $Max) {
-                        $Active = -1
+                        $Active = 0
                         $Offset = 0
+                    } else {
+                        $Active = [Math]::Min($Max, $Active + 1)
+                        $Offset = [Math]::Max($Offset, $Active - $Height + 1)
                     }
-                    $Active = [Math]::Min($Max, $Active + 1)
-                    $Offset = [Math]::Max($Offset, $Active - $Height)
+                    # DEBUG:
+                    Write-Host (($SetXY -f ($Width - 35), 0) + ("{{DN}} Active: {0:d2} Offset: {1:d2} of {2:d3}" -f $Active, $Offset, $Filtered.Count) ) -NoNewline
+                }
+                # alpha numeric (and backspace)
+                {$_ -eq 8 -or $_ -ge 48 -and $_ -le 90} {
+                    # if (!$Key.KeyDown) { continue }
+
+                    # backspace
+                    if ($_ -eq 8) {
+                        # Ctrl backspace
+                        if ($key.ControlKeyState -match "RightCtrlPressed|LeftCtrlPressed") {
+                            while ($Filter.Length -and $Filter[-1] -notmatch "\s") {
+                                $null = $Filter.Remove($Filter.Length - 1, 1)
+                            }
+                        }
+                        if ($Filter.Length) {
+                            $null = $Filter.Remove($Filter.Length - 1, 1)
+                        }
+                    } else {
+                        $null = $Filter.Append($Key.Character)
+                    }
+
+                    if ($Filterable) {
+                        # Filter and redraw
+                        if ($Filter.Length) {
+                            $Filtered = $Lines -match "\b$($Filter.ToString() -split " " -join '.*\b')"
+                        } else {
+                            $Filtered = $Lines
+                        }
+                        $Select = @()
+                        $Active = $Filtered.Count - 1
+                        $Offset = [Math]::Max(0, $Active - $Height + 1)
+                    } else {
+                        # select
+                        $Selected = $Lines -match "\b$($Filter.ToString() -split " " -join '.*\b')"
+                        $Active = $Selected | Select-Object -Expand Index -First 1
+                        $Offset = [Math]::Max(0, $Selected[-1].Index - $Height + 1)
+                    }
+
+                    Write-Host (
+                        ($SetXY -f 5, ($Height + 2)) +
+                        $Filter.ToString() +
+                        $ForegroundColor.ToVtEscapeSequence() +
+                        ($BoxChars.HorizontalDouble * ($Width - 5 - $Filter.Length)) +
+                        $Fg:Clear
+                    ) -NoNewline
                 }
                 32 { # Space: select
-                    if(!$Key.KeyDown -or $Active -gt $Max) { continue }
+                    # if (!$Key.KeyDown) { continue }
 
-                    if ($Active -in $Selected) {
-                        $Selected = @($Selected -ne $Active)
+                    if ($Filter.Length -gt 0) {
+                        $null = $Filter.Append($Key.Character)
+                    }
+
+                    if ($Active -in $Select) {
+                        $Select = @($Select -ne $Active)
                     } else {
-                        $Selected += $Active
+                        $Select += $Active
                     }
                 }
                 13 {
                     Write-Host "$Main$Show" -NoNewline
-                    if($Selected.Count -eq 0) {
-                        $Selected = @($Active)
+                    if ($Select.Count -eq 0) {
+                        $Select = @($Active)
                     }
-                    $Collection[$Selected]
+                    $Collection[$Filtered[$Select].Index]
                     return
                 }
             }
-            Show-List @List -SelectedItems $Selected -Active $Active -Offset $Offset
+
+            $Max    = $Filtered.Count - 1
+            $Height = [Math]::Min($Filtered.Count, $MaxHeight)
+
+            Show-List @List -List $Filtered -SelectedItems $Select -Offset $Offset <# -Height $Height #> -Active $Active
         } while ($true)
     }
 }
-
-<#
-function New-Box {
-    [CmdletBinding()]
-    param (
-        # Width of the box
-        [ValidateRange(4,1024)]
-        [Parameter()]
-        [int]$Width = $Host.UI.RawUI.WindowSize.Width,
-
-        # Width of the box
-        [ValidateRange(4, 1024)]
-        [Parameter()]
-        [int]$Height = $($Host.UI.RawUI.WindowSize.Height - 6),
-
-        [RgbColor]$BackgroundColor = $Host.PrivateData.WarningBackgroundColor,
-
-        [RgbColor]$ForegroundColor = $Host.PrivateData.WarningForegroundColor
-    )
-    begin {
-    }
-    process {
-    }
-    end {
-        $BackgroundColor.ToVtEscapeSequence()
-        $ForegroundColor.ToVtEscapeSequence()
-        $BoxChars.TopLeftDouble + ($BoxChars.HorizontalDouble * ($Width - 2)) + $BoxChars.TopRightDouble
-        ($BoxChars.VerticalDouble + (" " * ($Width - 2)) + $BoxChars.VerticalDouble) * $Height
-        $BoxChars.BottomLeftDouble + ($BoxChars.HorizontalDouble * ($Width - 2)) + $BoxChars.BottomRightDouble
-        $Fg:Clear
-        $Bg:Clear
-    }
-}
-#>

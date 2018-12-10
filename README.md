@@ -19,10 +19,10 @@ I just started playing. I have created:
   - Scrolls if there are too many items for the screen
   - Returns the actual selected item(s)!
   - Select by pressing space, or just hit enter to return the current item
+  - **Now** Supports type-ahead searching **or** filtering
 
 Things that don't work, for instance:
 
-- The highlights on `Show-List` don't have a "width" so they're only as wide as the text of the item
 - There's no way to specify which properties are shown
-- You can't type text to select matching items
-- There's no filtering
+- You can't sort after the display
+- Multi-select isn't intuitive enough: you can press Space to toggle selection, but you can't hold SHIFT and press the Up/Down arrows.

@@ -41,9 +41,9 @@ function Show-List {
     }
 
     # if they filter, we're going to need to blank the rest of the lines
-    while ($Line -lt $Height) {
-        $item = " " * $Width
-        Write-Host (($SetXY -f $Left, $Line++) + $HighlightColor.ToVtEscapeSequence($true) + $item + $Bg:Clear) -NoNewline
+    $item = " " * $Width
+    while ($Line -le $Height) {
+        Write-Host (($SetXY -f $Left, $Line++) + $BackgroundColor.ToVtEscapeSequence($true) + $item + $Bg:Clear) -NoNewline
     }
 
 }
