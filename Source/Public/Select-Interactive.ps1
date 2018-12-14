@@ -1,15 +1,30 @@
 function Select-Interactive {
+    <#
+        .SYNOPSIS
+            Shows Format-Table output in an alternate buffer in the console to allow filtering & selection
+        .DESCRIPTION
+            Select-Interactive calls Format-Table and displays the output in an alternate buffer.
+            In that buffer you can type to select (or filter, with the -Filterable switch) and use the up and down arrows to select items.
+            To select multiple items, press space to toggle selection -- otherwise, just hit Enter to return the highlighted item.
+
+            Supports scrolling (or filtering) when there are too many items for one screen.
+    #>
     [CmdletBinding()]
     param (
+        # A title to show above the items (defaults to no title)
         [string]$Title,
 
+        # The items to select from
         [Parameter(ValueFromPipeline)]
         [PSObject[]]$InputObject,
 
+        # An alternate color for the background of the alternate buffer
         [RgbColor]$BackgroundColor = $Host.PrivateData.WarningBackgroundColor,
 
-        [RgbColor]$ForegroundColor = $Host.PrivateData.WarningForegroundColor,
+        # The color of the border (defaults to the Warning foreground color)
+        [RgbColor]$BorderColor = $Host.PrivateData.WarningForegroundColor,
 
+        # If set, typing text _filters_ the list rather than moving the selection
         [switch]$Filterable
     )
     begin {
@@ -30,13 +45,13 @@ function Select-Interactive {
         $LineHeight = $Lines.Count
         $BorderHeight = [Math]::Min($Host.UI.RawUI.WindowSize.Height, $LineHeight + 2)
 
-        # Use alternate screen buffer, and
+        # Use alternate screen buffer, and hide the text cursor
         Write-Host "$Alt$Hide" -NoNewline
-        # Make sure the title doesn't scroll off
+        # # Make sure the title doesn't scroll off?
         # Write-Host ("$Freeze" -f $TitleHeight, ($BorderHeight - 1)) -NoNewline
 
-        Show-Box -Width $BorderWidth -Height $BorderHeight -Title $Title -BackgroundColor $BackgroundColor -ForegroundColor $ForegroundColor
-        # Write-Host "Press Up or Down keys and ENTER to select... $Up" -ForegroundColor $ForegroundColor -NoNewline
+        Show-Box -Width $BorderWidth -Height $BorderHeight -Title $Title -BackgroundColor $BackgroundColor -ForegroundColor $BorderColor
+        # Write-Host "Press Up or Down keys and ENTER to select... $Up" -ForegroundColor $BorderColor -NoNewline
 
         $TitleHeight = if($Title) {
             1 + ($Title -split "\r?\n").Count
@@ -69,6 +84,7 @@ function Select-Interactive {
 
         Show-List @List -List $Filtered -Active $Active -SelectedItems $Select -Offset $Offset
 
+        # # This doesn't seem necessary any more, but it was to make sure no keystrokes from before affect this
         # do {
         #     $null = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyUp,IncludeKeyDown")
         # } while ($Host.UI.RawUI.KeyAvailable)
@@ -80,8 +96,7 @@ function Select-Interactive {
             }
             $Key = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
             switch ($Key.VirtualKeyCode) {
-                38 {# UP KEY
-                    # Ignore the key up because we act on key down
+                38 {# UP ARROW KEY
                     if ($Active -le 0) {
                         $Active = $Max
                         $Offset = $Filtered.Count - $Height
@@ -93,8 +108,7 @@ function Select-Interactive {
                         Write-Host (($SetXY -f ($Width - 35), 0) + ("{{UP}} Active: {0:d2} Offset: {1:d2} of {2:d3} ({3:d2})   " -f $Active, $Offset, $Max, $Filtered.Count) ) -NoNewline
                     }
                 }
-                40 {# DOWN KEY
-                    # Ignore the key up because we act on key down
+                40 {# DOWN ARROW KEY
                     if ($Active -ge $Max) {
                         $Active = 0
                         $Offset = 0
@@ -106,7 +120,8 @@ function Select-Interactive {
                         Write-Host (($SetXY -f ($Width - 35), 0) + ("{{DN}} Active: {0:d2} Offset: {1:d2} of {2:d3}" -f $Active, $Offset, $Filtered.Count) ) -NoNewline
                     }
                 }
-                # alpha numeric (and backspace)
+                # alpha numeric keys (and backspace)
+                # Should probably allow punctuation, but doesn't yet
                 {$_ -eq 8 -or $_ -ge 48 -and $_ -le 90} {
                     # backspace
                     if ($_ -eq 8) {
@@ -134,7 +149,7 @@ function Select-Interactive {
                         $Active = $Filtered.Count - 1
                         $Offset = [Math]::Max(0, $Active - $Height + 1)
                     } else {
-                        # select
+                        # Scroll and highlight
                         $Selected = $Lines | Where-Object { $_  -replace $EscapeRegex -match "\b$($Filter.ToString() -split " " -join '.*\b')" }
                         $Active = $Selected | Select-Object -Expand Index -First 1
                         $Offset = [Math]::Max(0, $Selected[-1].Index - $Height + 1)
@@ -143,12 +158,12 @@ function Select-Interactive {
                     Write-Host (
                         ($SetXY -f 4, $Host.UI.RawUI.WindowSize.Height) +
                         $Filter.ToString() +
-                        $ForegroundColor.ToVtEscapeSequence() +
+                        $BorderColor.ToVtEscapeSequence() +
                         ($BoxChars.HorizontalDouble * ($Width - 4 - $Filter.Length)) +
                         $Fg:Clear
                     ) -NoNewline
                 }
-                32 { # Space: select
+                32 { # Space: toggle selection
                     if ($Filter.Length -gt 0) {
                         $null = $Filter.Append($Key.Character)
                     }
@@ -159,7 +174,7 @@ function Select-Interactive {
                         $Select += $Active
                     }
                 }
-                13 {
+                13 { # Enter: return results
                     Write-Host "$Main$Show" -NoNewline
                     if ($Select.Count -eq 0) {
                         $Select = @($Active)

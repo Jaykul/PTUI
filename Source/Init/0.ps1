@@ -44,8 +44,8 @@ $SetXY = "$e[{1};{0}H"  # Cursor Position 	*Cursor moves to {1}; {0} coordinate 
 # $SetXY = "$e[{0};{1}f"  # Horizontal Vertical Position 	*Cursor moves to {1}; {0} coordinate within the viewport, where {1} is the column of the {0} line
 $Save  = "$e[s"         # Save Cursor – Ansi.sys emulation 	**With no parameters, performs a save cursor operation like DECSC
 $Load  = "$e[u"         # Restore Cursor – Ansi.sys emulation 	**With no parameters, performs a restore cursor operation like DECRC
-$Show  = "$e[?25h" # Text Cursor Enable Mode Show 	Show the cursor
-$Hide  = "$e[?25l" # Text Cursor Enable Mode Hide 	Hide the cursor
+$Show  = "$e[?25h"      # Text Cursor Enable Mode Show 	Show the cursor
+$Hide  = "$e[?25l"      # Text Cursor Enable Mode Hide 	Hide the cursor
 $Alt   = "$e[?1049h"
 $Main  = "$e[?1049l"
 
