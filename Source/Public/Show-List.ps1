@@ -29,10 +29,10 @@ function Show-List {
     # Write out all the lines
     $Line   = $Top
     for ($i = $Offset; $i -lt $Last; $i++) {
-        $Bg = if ($i -in $SelectedItems) {
-            $SelectionColor.ToVtEscapeSequence($true)
-        } elseif ($i -eq $ActiveIndex) {
+        $Bg = if ($i -eq $ActiveIndex) {
             $HighlightColor.ToVtEscapeSequence($true)
+        } elseif ($i -in $SelectedItems) {
+            $SelectionColor.ToVtEscapeSequence($true)
         } else {
             $BackgroundColor.ToVtEscapeSequence($true)
         }

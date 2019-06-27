@@ -45,19 +45,20 @@ function Select-Interactive {
         $LineHeight = $Lines.Count
         $BorderHeight = [Math]::Min($Host.UI.RawUI.WindowSize.Height, $LineHeight + 2)
 
-        # Use alternate screen buffer, and hide the text cursor
-        Write-Host "$Alt$Hide" -NoNewline
-        # # Make sure the title doesn't scroll off?
-        # Write-Host ("$Freeze" -f $TitleHeight, ($BorderHeight - 1)) -NoNewline
-
-        Show-Box -Width $BorderWidth -Height $BorderHeight -Title $Title -BackgroundColor $BackgroundColor -ForegroundColor $BorderColor
-        # Write-Host "Press Up or Down keys and ENTER to select... $Up" -ForegroundColor $BorderColor -NoNewline
-
-        $TitleHeight = if($Title) {
+        $TitleHeight = if ($Title) {
             1 + ($Title -split "\r?\n").Count
         } else {
             0
         }
+
+        # Use alternate screen buffer, and hide the text cursor
+        Write-Host "$Alt$Hide" -NoNewline
+
+        Show-Box -Width $BorderWidth -Height $BorderHeight -Title $Title -BackgroundColor $BackgroundColor -ForegroundColor $BorderColor
+        # Make sure the top and bottom borders don't scroll
+        Write-Host ("$Freeze" -f ($TitleHeight + 1), ($BorderHeight - 1)) -NoNewline
+
+        # Write-Host "Press Up or Down keys and ENTER to select... $Up" -ForegroundColor $BorderColor -NoNewline
 
         $MaxHeight = $Host.UI.RawUI.WindowSize.Height - 2 - $TitleHeight
         $Width = [Math]::Min($LineWidth, $Host.UI.RawUI.WindowSize.Width - 2)
@@ -97,6 +98,11 @@ function Select-Interactive {
             $Key = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
             switch ($Key.VirtualKeyCode) {
                 38 {# UP ARROW KEY
+                    if (($Key.ControlKeyState -band "ShiftPressed") -eq "ShiftPressed") {
+                        if ($Active -notin $Select) {
+                            $Select += $Active
+                        }
+                    }
                     if ($Active -le 0) {
                         $Active = $Max
                         $Offset = $Filtered.Count - $Height
@@ -104,17 +110,32 @@ function Select-Interactive {
                         $Active = [Math]::Max(0, $Active - 1)
                         $Offset = [Math]::Min($Offset, $Active)
                     }
+                    if (($Key.ControlKeyState -band "ShiftPressed") -eq "ShiftPressed") {
+                        if ($Active -notin $Select) {
+                            $Select += $Active
+                        }
+                    }
                     if ($DebugPreference -ne "SilentlyContinue") {
                         Write-Host (($SetXY -f ($Width - 35), 0) + ("{{UP}} Active: {0:d2} Offset: {1:d2} of {2:d3} ({3:d2})   " -f $Active, $Offset, $Max, $Filtered.Count) ) -NoNewline
                     }
                 }
                 40 {# DOWN ARROW KEY
+                    if (($Key.ControlKeyState -band "ShiftPressed") -eq "ShiftPressed") {
+                        if ($Active -notin $Select) {
+                            $Select += $Active
+                        }
+                    }
                     if ($Active -ge $Max) {
                         $Active = 0
                         $Offset = 0
                     } else {
                         $Active = [Math]::Min($Max, $Active + 1)
                         $Offset = [Math]::Max($Offset, $Active - $Height + 1)
+                    }
+                    if (($Key.ControlKeyState -band "ShiftPressed") -eq "ShiftPressed") {
+                        if ($Active -notin $Select) {
+                            $Select += $Active
+                        }
                     }
                     if ($DebugPreference -ne "SilentlyContinue") {
                         Write-Host (($SetXY -f ($Width - 35), 0) + ("{{DN}} Active: {0:d2} Offset: {1:d2} of {2:d3}" -f $Active, $Offset, $Filtered.Count) ) -NoNewline
