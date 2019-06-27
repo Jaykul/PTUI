@@ -10,7 +10,7 @@ param(
 Push-Location $PSScriptRoot -StackName BuildModule
 try {
     ## Build the actual module
-    Build-Module .\Source @PSBoundParameters
+    Build-Module .\Source @PSBoundParameters -Prefix .\Init\0.ps1
 } finally {
     Pop-Location -StackName BuildModule
 }
