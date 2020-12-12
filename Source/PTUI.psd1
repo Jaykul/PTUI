@@ -14,6 +14,7 @@
             # IconUri = ''
         } # PSData
     } # PrivateData
+    RequiredModules   = @('PANSIES')
 
     RootModule        = 'PTUI.psm1'
     GUID              = 'bbf3ac6d-574e-49c1-891b-9064163b84c1'

@@ -203,8 +203,12 @@ function Select-Interactive {
                     $Collection[$Filtered[$Select].Index]
                     return
                 }
+                27 { # ESC: return nothing
+                    Write-Host "$Main$Show" -NoNewline
+                    $Select = @()
+                    return
+                }
             }
-
             $Max    = $Filtered.Count - 1
             $Height = [Math]::Min($Filtered.Count, $MaxHeight)
 
