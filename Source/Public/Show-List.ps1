@@ -36,7 +36,16 @@ function Show-List {
         } else {
             $BackgroundColor.ToVtEscapeSequence($true)
         }
-        $item = $List[$i].TrimEnd().PadRight($Width).Substring(0,$Width)
+        $item = $List[$i].TrimEnd()
+        $plainItem = $item -replace $EscapeRegex
+
+        $item = $item.PadRight($Width)
+        if ($plainItem.Length -gt $Width) {
+            $trimable = $plainItem.Substring($Width)
+            $item = $item -replace ([regex]::Escape($trimable))
+            $plainItem = $item -replace $EscapeRegex
+        }
+
         Write-Host (($SetXY -f $Left, $Line++) + $Bg + $item + $Bg:Clear) -NoNewline
     }
 
