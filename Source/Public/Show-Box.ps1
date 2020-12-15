@@ -3,9 +3,11 @@ function Show-Box {
     param (
         [string]$Title,
 
+        [switch]$CenterTitle,
+
         [int]$Width = $($Host.UI.RawUI.WindowSize.Width),
 
-        [int]$Height = $($Host.UI.RawUI.WindowSize.Height - (if($Title){($Title -split "\r?\n").Count} else {0})),
+        [int]$Height = $($Host.UI.RawUI.WindowSize.Height),
 
         [RgbColor]$BackgroundColor = $Host.PrivateData.WarningBackgroundColor,
 
@@ -33,8 +35,8 @@ function Show-Box {
             if ($Title) {
                 foreach ($l in $Title -split "\r?\n") {
                     $TitleLength = ($l -replace $EscapeRegex).Length
-                    [int]$TitlePadding = if ($l -match "^\s+") {
-                        1
+                    [int]$TitlePadding = if (!$CenterTitle) {
+                        2
                     } else {
                         (($Width - $TitleLength) / 2) - 1
                     }
@@ -49,9 +51,8 @@ function Show-Box {
             }
         )
         $TitleBar
-
         # Main box
-        for ($i = 0; $i -lt $Height; $i++) {
+        for ($i = 0; $i -lt ($Height - $TitleHeight); $i++) {
             Write-Host -NoNewline ("`n" + $b + $f + $BoxChars.VerticalDouble + (" " * $Width) + $BoxChars.VerticalDouble)
         }
 

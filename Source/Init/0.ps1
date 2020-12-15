@@ -49,4 +49,10 @@ $Hide  = "$e[?25l"      # Text Cursor Enable Mode Hide 	Hide the cursor
 $Alt   = "$e[?1049h"
 $Main  = "$e[?1049l"
 
+$ICH = "$e[{0}@" # Insert Character 	Insert <n> spaces at the current cursor position, shifting all existing text to the right. Text exiting the screen to the right is removed.
+$DCH = "$e[{0}P" # Delete Character 	Delete <n> characters at the current cursor position, shifting in space characters from the right edge of the screen.
+$ECH = "$e[{0}X" # Erase Character 	Erase <n> characters from the current cursor position by overwriting them with a space character.
+$IL = "$e[{0}L" # Insert Line 	Inserts <n> lines into the buffer at the cursor position. The line the cursor is on, and lines below it, will be shifted downwards.
+$DL = "$e[{0}M" # Delete Line 	Deletes <n> lines from the buffer, starting with the row the cursor is on.
+
 $Freeze= "$e[{0};{1}r"

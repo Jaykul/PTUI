@@ -39,7 +39,7 @@ function Show-List {
         $item = $List[$i].TrimEnd()
         $plainItem = $item -replace $EscapeRegex
 
-        $item = $item.PadRight($Width)
+        $item = $item + (" " * ($width - $plainItem.Length))
         if ($plainItem.Length -gt $Width) {
             $trimable = $plainItem.Substring($Width)
             $item = $item -replace ([regex]::Escape($trimable))
@@ -51,7 +51,7 @@ function Show-List {
 
     # if they filter, we're going to need to blank the rest of the lines
     $item = " " * $Width
-    while ($Line -le $Height + 1) {
+    while ($Line -lt $Height + $Top) {
         Write-Host (($SetXY -f $Left, $Line++) + $BackgroundColor.ToVtEscapeSequence($true) + $item + $Bg:Clear) -NoNewline
     }
 }
