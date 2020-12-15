@@ -11,7 +11,7 @@ function Select-Interactive {
     #>
     [CmdletBinding()]
     param (
-        # A title to show above the items (defaults to no title)
+        # A title to show above the items (defaults to no the table header)
         [string]$Title,
 
         # The items to select from
@@ -34,22 +34,25 @@ function Select-Interactive {
         [PSObject[]]$Collection += $InputObject
     }
     end {
+        $DebugPreference = "SilentlyContinue"
         $null = $PSBoundParameters.Remove("InputObject")
 
-        $Lines = $Collection | Format-Table -HideTableHeaders -GroupBy {} | Out-String -Stream
-        $Lines = TrimLines $Lines
-
-        $LineWidth = $Lines + @($Title) -replace $EscapeRegex | Measure-Object Length -Maximum | Select-Object -ExpandProperty Maximum
-        $BorderWidth  = [Math]::Min($Host.UI.RawUI.WindowSize.Width, $LineWidth + 2)
-
-        $LineHeight = $Lines.Count
-        $BorderHeight = [Math]::Min($Host.UI.RawUI.WindowSize.Height, $LineHeight + 2)
+        $Header, $Lines = $Lines = $Collection | Format-Table -GroupBy {} | Out-String -Stream | TrimLines
+        if (!$Title) {
+            $Title = $Header
+        }
 
         $TitleHeight = if ($Title) {
             1 + ($Title -split "\r?\n").Count
         } else {
             0
         }
+
+        $LineWidth = $Lines + @($Title) -replace $EscapeRegex | Measure-Object Length -Maximum | Select-Object -ExpandProperty Maximum
+        $BorderWidth  = [Math]::Min($Host.UI.RawUI.WindowSize.Width, $LineWidth + 2)
+
+        $LineHeight = $Lines.Count
+        $BorderHeight = [Math]::Min($Host.UI.RawUI.WindowSize.Height, $LineHeight + 2 + $TitleHeight)
 
         # Use alternate screen buffer, and hide the text cursor
         Write-Host "$Alt$Hide" -NoNewline
